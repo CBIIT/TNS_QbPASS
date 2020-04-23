@@ -135,8 +135,8 @@ for i = 1:numel(ParIndNames)
     
     for ii = 1:numel(CondStr)
         
-                ChanInd = [];
-
+        ChanInd = [];
+        
         % find all test condition associated matrices
         indType = find(contains(AllCondStr, CondStr{ii}));
         
@@ -226,14 +226,14 @@ switch Export2CSV
     case 'no'
 end
 
-if contains(CondStr,'LED')
-TrigInd = find(contains(CondStr,'LED'));
-BackOnInd = find(contains(CondStr,'Trigger B Off'));
-BackOffInd = find(contains(CondStr,'Trigger B On'));
+if max(contains(CondStr,'LED')) == 1
+    TrigInd = find(contains(CondStr,'LED'));
+    BackOnInd = find(contains(CondStr,'Trigger B Off'));
+    BackOffInd = find(contains(CondStr,'Trigger B On'));
 else
- TrigInd = find(contains(CondStr,'L 1'));
-BackOnInd = find(contains(CondStr,'B 0'));
-BackOffInd = find(contains(CondStr,'B 1'));   
+    TrigInd = find(contains(CondStr,'L 1'));
+    BackOnInd = find(contains(CondStr,'B 0'));
+    BackOffInd = find(contains(CondStr,'B 1'));
 end
 
 
