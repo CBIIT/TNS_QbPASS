@@ -9,8 +9,16 @@ Database.(ID).Summary = app.Summary;
 Database.(ID).OptiStats = app.OptiStats;
 Database.(ID).VoltTNames = app.TData;
 Database.(ID).VoltTData = app.UITable2.Data;                      
-
+Database.(ID).PhiThreshold = loadPhiThreshold(app);
 save(filename,'-struct','Database','-append')
 
                             
+end
+
+function [PhiThreshold] = loadPhiThreshold(app)
+
+PhiSets = getpref('QbPASS','PhiThresholdSet');
+ind = contains(PhiSets(:,1), app.ThresholdtypeDropDown.Value);
+PhiThreshold = PhiSets(ind,:);
+            
 end
