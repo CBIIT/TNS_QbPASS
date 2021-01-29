@@ -1,4 +1,4 @@
-function [string, Summary, OtptStats] = QbPASS_OptimalDataset_v5(LData, Limits, Export2CSV, TableData, XLimMax)
+function [string, Summary, OtptStats] = QbPASS_OptimalDataset_v5(LData, Limits, Export2CSV, TableData, XLimMax, phiThreshold, folder)
 
 MaxChannel = LData.DyRange * (getpref('QbPASS','Threshold_Channel')/100);
 GuiVoltage = [];
@@ -66,9 +66,11 @@ end
 switch Export2CSV
     case 'yes'
         TimeStamp = replace(datestr(datetime('now')), ':','-');
-        DateStr = [TimeStamp,'.xls'];
-        [file,path] = uiputfile('*.xls', 'Save Output File', DateStr);
+        DateStr = [TimeStamp,'.xlsx'];
+        [file,path] = uiputfile('*.xlsx', 'Save Output File', DateStr);
         OutputStr = fullfile(path, file);
+    case 'report'
+        OutputStr = fullfile(folder, 'QbPASS Processed Statistics.xlsx');
     case 'no'
         
 end
@@ -117,7 +119,7 @@ for i = 1:numel(Var1A)
     end
     
     switch Export2CSV
-        case 'yes'
+        case {'yes','report'}
             % write cell matrix to .xls sheet
             writecell(WriteDataFinal,OutputStr,'Sheet',Var1A{i})
         case 'no'
@@ -220,20 +222,20 @@ for i = 1:numel(CondStr)
 end
 
 switch Export2CSV
-    case 'yes'
+    case {'yes','report'}
         % write optimal datasets to file
         writecell(FullOptiData,OutputStr,'Sheet','Optimal')
     case 'no'
 end
 
-if max(contains(CondStr,'LED')) == 1
-    TrigInd = find(contains(CondStr,'LED'));
-    BackOnInd = find(contains(CondStr,'Trigger B Off'));
-    BackOffInd = find(contains(CondStr,'Trigger B On'));
+if max(contains(CondStr,'LED','IgnoreCase',true)) == 1
+    TrigInd = find(contains(CondStr,'LED','IgnoreCase',true));
+    BackOnInd = find(contains(CondStr,'Trigger B Off','IgnoreCase',true));
+    BackOffInd = find(contains(CondStr,'Trigger B On','IgnoreCase',true));
 else
-    TrigInd = find(contains(CondStr,'L 1'));
-    BackOnInd = find(contains(CondStr,'B 0'));
-    BackOffInd = find(contains(CondStr,'B 1'));
+    TrigInd = find(contains(CondStr,'L 1','IgnoreCase',true));
+    BackOnInd = find(contains(CondStr,'B 0','IgnoreCase',true));
+    BackOffInd = find(contains(CondStr,'B 1','IgnoreCase',true));
 end
 
 
@@ -244,7 +246,9 @@ Summary.F0SD = OptiSD{TrigInd};
 Summary.B0med = OptiChan{BackOnInd};
 Summary.B0SD = OptiSD{BackOnInd};
 Summary.MuFoRaw = OptiChan{TrigInd}-OptiChan{BackOnInd};
+Summary.Gain = (  OptiSD{TrigInd}.^2 - OptiSD{BackOnInd}   .^2) ./ OptiChan{TrigInd}-OptiChan{BackOnInd};
 Summary.SpeRaw = ( (OptiChan{TrigInd}  - OptiChan{BackOnInd}).^2) ./ (OptiSD{TrigInd}.^2 - OptiSD{BackOnInd}.^2);
+Summary.SpeRaw2 = Summary.MuFoRaw ./ Summary.Gain;
 Summary.SP2Raw = (((OptiChan{TrigInd}  - OptiChan{BackOnInd}).^2) ./ (OptiSD{TrigInd}.^2 + OptiSD{BackOnInd}.^2));
 Summary.PhiRaw = (  OptiSD{TrigInd}.^2 - OptiSD{BackOnInd}   .^2) ./ (OptiSD{TrigInd}.^2 + OptiSD{BackOnInd}.^2);
 Summary.SspeRaw =  Summary.SpeRaw ./  Summary.MuFoRaw;
@@ -253,7 +257,7 @@ Summary.MuBoRaw = ( Summary.MuFoRaw/2) .* ((( Summary.SspeRaw.* Summary.MuFoRaw)
 Summary.VtRaw = cell2mat(Data2(:,1));
 Summary.VtInt = min( Summary.VtRaw):max( Summary.VtRaw);
 Summary.ParName = ParIndNames;
-Summary.phiThreshold = getpref('QbPASS','Threshold_Phi');
+Summary.phiThreshold = phiThreshold;
 Summary.gradThreshold = getpref('QbPASS','Threshold_Grad');
 
 %% generate interpolate data and find optimal values
@@ -285,15 +289,30 @@ for i = 1:size( Summary.SP2Raw,2)
         Summary.VtOpt(i) = NaN;
     end
     try
-        [ Summary.VtOpt(i), MaxSP2Ind(:,i)]   = IntersectDetermination(Summary, i); % optimal voltage
+        Summary.GainInt(:,i)  = interp1( Summary.VtRaw,  Summary.Gain(:,i),   Summary.VtInt,'makima'); % get interpolated SD^2 data
+    catch
+        Summary.GainOpt(i) = NaN;
+    end
+    try
+        [ Summary.VtOpt(i), MaxSP2Ind(:,i)]   = IntersectDetermination(Summary, i); % optimal voltage for SP^2
         vtInd =  Summary.VtInt ==  Summary.VtOpt(i);
         Summary.SSpeOpt(i) =  Summary.SpeInt(vtInd,i)/ Summary.MuFoInt(vtInd,i); % SSpe at optimal voltage
         Summary.SP2Opt(i)  =  Summary.SP2Int(vtInd,i); % SP2 at optimal voltage
         Summary.MuFoOpt(i) =  Summary.MuFoInt(vtInd,i); % mean Fo at optimal voltage
         Summary.MuBoOpt(i) = ( Summary.MuFoOpt(i)/2) * ((( Summary.SSpeOpt(i) *  Summary.MuFoOpt(i)) /  Summary.SP2Opt(i)) - 1); % mean Bo at optimal voltage
+        
     catch
         Summary.VtOpt(i) = NaN;
     end
+    try
+        Summary.PhiVtOpt(i)   = IntersectDetermination2(Summary, i); % optimal voltage for SP^2
+        
+    catch
+        Summary.PhiVtOpt(i) = NaN;
+        
+    end
+%     IntersectDetermination3(Summary, i); % optimal voltage for SP^2
+    
 end
 
 %% create  Summary statistics
@@ -303,6 +322,7 @@ for i = 1:size( Summary.SpeRaw,2)
     
     OtptStats.ParName{i} =  Summary.ParName{i};
     OtptStats.VtOpt(i) =  Summary.VtOpt(i);
+    OtptStats.PhiVtOpt(i) = Summary.PhiVtOpt(i);
     OtptStats.ERFvt(i) = TableData{i,5};
     
     % statistcs relying upon ERF calibration voltage
@@ -326,10 +346,10 @@ for i = 1:size( Summary.SpeRaw,2)
     OtptStats.Btot(i)      = ( OtptStats.MuFo(i) -  OtptStats.Phi(i) *  OtptStats.MuFMed(i))/2;
     OtptStats.Bspe(i)      =  OtptStats.MuBoSpe(i) *  OtptStats.Sspe(i);
     OtptStats.BeadSpe(i)   =  OtptStats.Channel(i) *  OtptStats.F0B0(i);
-    OtptStats.MChSpe(i)       = max(cell2mat(LData.Range(:)))*OtptStats.F0B0(i);
-    OtptStats.DyRSpe(i)       = OtptStats.MChSpe(i)-OtptStats.MuBMed(i);
-    OtptStats.DyRDb(i)        = 10.*log10(OtptStats.DyRSpe(i));
-    %     end
+    OtptStats.MChSpe(i)    = max(cell2mat(LData.Range(:)))*OtptStats.F0B0(i);
+    OtptStats.DyRSpe(i)    = OtptStats.MChSpe(i)-OtptStats.MuBMed(i);
+    OtptStats.DyRDb(i)     = 10.*log10(OtptStats.DyRSpe(i));
+
 end
 
 app.LoadedDataset.Summary = Summary;
@@ -337,7 +357,7 @@ app.LoadedDataset.Summary = Summary;
 
 %% export data
 switch Export2CSV
-    case 'yes'
+    case {'yes','report'}
         
         %% generate names for writing to file
         SP2Header = strcat({'SP^2 ('}, ParIndNames, {')'});
@@ -351,7 +371,8 @@ switch Export2CSV
         writecell(SP2DataWrite,OutputStr,'Sheet','SP^2');
         
         DataHeaders = {'Parameter',...
-            'Min Vt',...
+            'SP^2 Min Vt',...
+            'Phi Min Vt',...
             'ERF Vt',...
             'µ F',...
             'Sigma F',...
@@ -379,6 +400,7 @@ switch Export2CSV
         
         Data = vertcat(DataHeaders, [ Summary.ParName(:),...
             num2cell(real([ OtptStats.VtOpt(:),...
+            OtptStats.PhiVtOpt(:),...
             round( OtptStats.ERFvt(:), 2),...
             round( OtptStats.MuFMed(:), 2),...
             round( OtptStats.MuFSD(:), 2),...
@@ -523,6 +545,71 @@ ylim([0 yHigh])
 xlim([0 max(xDatai)+10])
 set(gca,'YColor','r')
 
+end
+
+
+function [IntersectX] = IntersectDetermination2(Summary, SumInd)
+
+xData =  Summary.VtRaw;
+yData =  Summary.PhiRaw(:,SumInd);
+xDatai =  Summary.VtInt;
+yDatai =  Summary.PhiInt(:,SumInd);
+thresh =  Summary.phiThreshold;
+thresh2 = max(yDatai) * thresh;
+yDataInd = min(find(yDatai >= thresh2));
+
+IntersectX = xDatai(yDataInd);
+end
+
+function []=IntersectDetermination3(Summary, SumInd)
+
+if contains(Summary.ParName(SumInd),'-H')
+else
+    xData =  Summary.VtRaw;
+    yData =  Summary.Gain (:,SumInd);
+    
+    xDatai =  Summary.VtInt;
+    yDatai =  Summary.GainInt(:,SumInd);
+    
+    yData2 = yData(xData>200);
+    xData2 = xData(xData>200);
+    [~,VtInd] = min(yData2);
+    minVtThr = xData2(VtInd);
+    
+    minGainThrC = 3;
+    maxGainThrC = 4;
+    
+    [~, minGainThr] = min(sqrt((Summary.GainInt(xDatai>minVtThr,SumInd)-minGainThrC).^2));
+    [~, maxGainThr] = min(sqrt((Summary.GainInt(xDatai>minVtThr,SumInd)-maxGainThrC).^2));
+    
+    xData2i = xDatai(xDatai>minVtThr);
+    GainThr = [xData2i(minGainThr) xData2i(maxGainThr)];
+    
+    thresh =  Summary.PhiVtOpt(SumInd);
+    maxy = ceil((max(yData)*1.1)/100)*100;
+    
+    if SumInd == 1
+        close all
+        figure('units','normalized','position',[0 0 1 1])
+        tiledlayout('flow','Padding','compact','TileSpacing','compact')
+    end
+    nexttile
+        plot(xDatai, yDatai,'-b','linewidth',2)
+    hold on
+
+    scatter(xData, yData,10,'or','filled')
+    % line([thresh thresh],[0.1 maxy],'color','k','linewidth',2','linestyle',':');
+    % fill([ GainThr fliplr(GainThr)], [  0.1 0.1 maxy maxy],'r','facealpha',0.1)
+    
+    % ylim([0.1 maxy])
+    xlim([1 10000])
+    
+    set(gca,'yscale','log','xscale','log','box','on','linewidth',2,'FontSize',13)
+    
+    xlabel([Summary.ParName{SumInd},' Voltage'],'FontSize',13)
+%     ylabel('Gain','FontSize',13)
+%     legend({'Raw Stats','Interp Stats','Phi Vt','Gain Vt'},'location','northeast','box','off')
+end
 end
 
 

@@ -13,14 +13,15 @@ Names.LaserStat = Names.LaserStat;
 Names.TestCond = Names.TestCond;
 
 PlotNo = ceil((numel(Names.ParNames)+1)/PlotWid);
-
+xPlots = 5;
+yPlots = 6;
 fig = figure('Units','Normalized','Position',[0 0 1 1],'Visible','off');
 
 switch PType
     case 'QC'
-        Bind = or(categorical(Names.TestCond) == {'B'}, categorical(Names.TestCond) == {'Trigger B'});
-        Lind1 = or(categorical(Names.LaserStat) == categorical(1), categorical(Names.LaserStat) == 'On');
-        Lind2 = or(categorical(Names.LaserStat) == categorical(0), categorical(Names.LaserStat) == 'Off');
+        Bind = or(categorical(Names.TestCond) == {'B'}, strcmpi(Names.TestCond, 'Trigger B'));
+        Lind1 = or(categorical(Names.LaserStat) == categorical(1), strcmpi(Names.LaserStat ,'On'));
+        Lind2 = or(categorical(Names.LaserStat) == categorical(0), strcmpi(Names.LaserStat, 'Off'));
         
         yInd1 = and(Bind, Lind1);
         yInd2 = and(Bind, Lind2);
@@ -28,13 +29,28 @@ switch PType
         ydatamax = [Data.SD(yInd1, :); Data.SD(yInd2, :)];
         maxY = max(ydatamax(:))^2;
         maxXlog = 1:ceil(log10(maxY));
-        t=  tiledlayout(PlotNo,PlotWid);
+        t= tiledlayout(yPlots,xPlots);
         t.TileSpacing = 'compact';
         t.Padding = 'none';
         t.YLabel.String = 'Standard Deviation^2';
         t.YLabel.FontSize = 18;
         t.YLabel.FontWeight = 'bold';
         for i = 1:numel(Names.ParNames)+1
+            
+            if i == (xPlots*yPlots)+1
+                count = 0; % reset count for new plot
+                
+                ind = numel(fig) + 1;
+                sgtitle([LData.ID, ' | ' , datestr(LData.AcqDate(1))],'FontSize',18,'FontWeight','bold')
+                fig(ind) = figure('Units','Normalized','Position',[0 0 1 1],'visible','off');
+                t= tiledlayout(yPlots,xPlots);
+                t.TileSpacing = 'compact';
+                t.Padding = 'none';
+                t.YLabel.String = 'Standard Deviation^2';
+                t.YLabel.FontSize = 18;
+                t.YLabel.FontWeight = 'bold';
+            end
+            
             nexttile
             if i == numel(Names.ParNames)+1
                 
@@ -57,9 +73,9 @@ switch PType
                 xdata2 = Data.Vt(yInd2, Pind);
                 xstr = [Names.ParNames{i}, ' Voltage'];
                 
-                xxInt1 = 0:max(xdata1);
+                xxInt1 = min(xdata1):max(xdata1);
                 yyInt1 = interp1(xdata1,ydata1, xxInt1,'makima');
-                xxInt2 = 0:max(xdata2);
+                xxInt2 = min(xdata2):max(xdata2);
                 yyInt2 = interp1(xdata2,ydata2, xxInt2,'makima');
                 
                 plot(xxInt1, yyInt1,'Color',[0 0.4470 0.7410],'linewidth',2)
@@ -201,6 +217,8 @@ switch PType
         
 end
 sgtitle([LData.ID, ' | ' , datestr(LData.AcqDate(1))],'FontSize',18,'FontWeight','bold')
-fig.Visible = 'off';
+for i = 1:numel(fig)
+fig(i).Visible = 'off';
+end
 end
 

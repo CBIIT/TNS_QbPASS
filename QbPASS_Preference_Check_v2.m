@@ -29,7 +29,6 @@ else
 end
 
 Pref = getpref('QbPASS');  % retrieve preferences
-
 end
 
 
@@ -37,47 +36,28 @@ function PrefVersionUpdate(Version)
 
 Prefs = {'GUI_ExtPlot','on';...
     'ExclusionParameters',{'FSC','SSC','Time'};...
-    'Threshold_Phi',0.8;...
     'Threshold_Grad',50;...
     'Threshold_Channel',50;...
     'FigLabel_FontSize', 'default';...
     'FigLabel_FontWeight', 'bold';...
-    'Fig_Tick_FontSize', 'default';...
-    'Fig_Tick_FontWeight', 'normal';...
     'FigTitle_FontSize', 'default';...
     'FigTitle_FontWeight', 'bold';...
     'FigAxes_FontSize', 'default';...
     'FigAxes_FontWeight', 'normal';...
-    'FigLabel_FontSize', 'default';...
-    'FigLabel_FontWeight', 'bold';...
     'VoltPlotStat', 'SD^2';...
-    'PhiThresholdSet',{'NIH S6',0.99; 'NIH X-50',0.95}};
+    'outputFormat', 'ps';...
+    'DeveloperAccess','off'};
 
-if ispref('QbPASS','version') == 1
-    if getpref('QbPASS','version') == Version
-    else
-        setpref('QbPASS','version', Version)
-        
-        for i = 1:size(Prefs,1)
-            
-            if ispref('QbPASS',Prefs{i,1}) == 1
-            else
-                setpref('QbPASS', Prefs{i,1}, Prefs{i,2})
-            end
-            
-        end
-    end
-else
-    setpref('QbPASS','version', Version)
+
+setpref('QbPASS','version', Version)
+
+for i = 1:size(Prefs,1)
     
-    for i = 1:size(Prefs,1)
-        
-        if ispref('QbPASS',Prefs{i,1}) == 1
-        else
-            setpref('QbPASS', Prefs{i,1}, Prefs{i,2})
-        end
-        
+    if ispref('QbPASS',Prefs{i,1}) == 1
+    else
+        setpref('QbPASS', Prefs{i,1}, Prefs{i,2})
     end
+    
 end
 
 end

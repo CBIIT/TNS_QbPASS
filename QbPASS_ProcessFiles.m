@@ -109,6 +109,7 @@ Dataset.(var).TestCond = app.Test_Condition;
 Dataset.(var).PulserInt = app.Pulser_Intensity;
 Dataset.(var).Voltage = app.Voltage;
 Dataset.(var).fcsdir = app.ImportSelpath;
+Dataset.(var).phiThresh = app.PhiThresholdEditField.Value;
 
 UnqParNames = unique(Dataset.(var).ParNames, 'stable')';
 ParInd = not(contains(UnqParNames(1,:), (getpref('QbPASS','ExclusionParameters'))));
